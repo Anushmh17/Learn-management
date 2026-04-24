@@ -784,7 +784,7 @@ $adminName = explode(' ', $user['name'] ?? 'Admin')[0];
   .dm-empty p { font-size: 12px; margin: 0; }
 
   /* ── Page padding override on mobile ── */
-  #page-content { padding: 16px 16px; }
+  #page-content { padding: 16px 20px; }
 }
 </style>
 
