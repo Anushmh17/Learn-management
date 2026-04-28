@@ -74,18 +74,7 @@ $roleLabels = ['admin'=>'Administrator','lecturer'=>'Lecturer','student'=>'Stude
     </button>
   </div>
 
-  <!-- User Info -->
-  <div class="sidebar-user">
-    <?php if ($avatar): ?>
-      <img src="<?= htmlspecialchars(BASE_URL.'/assets/uploads/'.$avatar) ?>" class="user-avatar" alt="avatar" style="object-fit:cover; border: 2px solid rgba(255,255,255,0.1);">
-    <?php else: ?>
-      <div class="user-avatar" style="background: linear-gradient(135deg, var(--primary), var(--accent));"><?= $initial ?></div>
-    <?php endif; ?>
-    <div class="user-info">
-      <div class="user-name"><?= htmlspecialchars($uname) ?></div>
-      <div class="user-role"><?= $roleLabels[$role] ?? $role ?></div>
-    </div>
-  </div>
+
 
   <!-- Navigation -->
   <div class="sidebar-nav">
