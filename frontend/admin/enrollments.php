@@ -18,21 +18,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($act === 'add' || $act === 'edit') {
         $student_id = (int)($_POST['student_id'] ?? 0);
         $course_id = (int)($_POST['course_id'] ?? 0);
-        $lecturer_id = !empty($_POST['lecturer_id']) ? (int)$_POST['lecturer_id'] : null;
-        $status = $_POST['status'] ?? 'active';
+        $status = $_POST['status'] ?? 'ongoing';
+        $start_date = $_POST['start_date'] ?? date('Y-m-d');
 
         if (!$student_id || !$course_id) {
             $error = 'Student and Course are required.';
         } else {
             try {
                 if ($act === 'add') {
-                    $pdo->prepare("INSERT INTO enrollments (student_id, course_id, lecturer_id, status) VALUES (?, ?, ?, ?)")
-                        ->execute([$student_id, $course_id, $lecturer_id, $status]);
+                    $pdo->prepare("INSERT INTO student_courses (student_id, course_id, status, start_date) VALUES (?, ?, ?, ?)")
+                        ->execute([$student_id, $course_id, $status, $start_date]);
                     setFlash('success', 'Enrollment created successfully.');
                 } else {
                     $id = (int)$_POST['id'];
-                    $pdo->prepare("UPDATE enrollments SET student_id=?, course_id=?, lecturer_id=?, status=? WHERE id=?")
-                        ->execute([$student_id, $course_id, $lecturer_id, $status, $id]);
+                    $pdo->prepare("UPDATE student_courses SET student_id=?, course_id=?, status=?, start_date=? WHERE id=?")
+                        ->execute([$student_id, $course_id, $status, $start_date, $id]);
                     setFlash('success', 'Enrollment updated successfully.');
                 }
                 header('Location: enrollments.php'); exit;
@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($act === 'delete') {
-        $pdo->prepare("DELETE FROM enrollments WHERE id=?")->execute([(int)$_POST['id']]);
+        $pdo->prepare("DELETE FROM student_courses WHERE id=?")->execute([(int)$_POST['id']]);
         setFlash('success', 'Enrollment deleted.');
         header('Location: enrollments.php'); exit;
     }
@@ -55,24 +55,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $editEnrollment = null;
 if ($action === 'edit' && isset($_GET['id'])) {
-    $stmt = $pdo->prepare("SELECT * FROM enrollments WHERE id=?");
+    $stmt = $pdo->prepare("SELECT * FROM student_courses WHERE id=?");
     $stmt->execute([(int)$_GET['id']]);
     $editEnrollment = $stmt->fetch();
 }
 
 // Fetch records for lists and dropdowns
 $search = trim($_GET['q'] ?? '');
-$sql = "SELECT e.*, c.course_name, c.course_code, s.full_name AS student_name, l.name AS lecturer_name
-        FROM enrollments e
-        JOIN courses c ON c.id = e.course_id
-        JOIN students s ON s.id = e.student_id
-        LEFT JOIN users l ON l.id = e.lecturer_id";
+$sql = "SELECT sc.*, c.course_name, c.course_code, s.full_name AS student_name, u.name AS lecturer_name
+        FROM student_courses sc
+        JOIN courses c ON c.id = sc.course_id
+        JOIN students s ON s.id = sc.student_id
+        LEFT JOIN course_assignments ca ON ca.course_id = c.id
+        LEFT JOIN users u ON u.id = ca.lecturer_id";
 $params = [];
 if ($search) {
     $sql .= " WHERE c.course_name LIKE ? OR c.course_code LIKE ? OR s.full_name LIKE ?";
     $params = ["%$search%", "%$search%", "%$search%"];
 }
-$sql .= " ORDER BY e.enrolled_at DESC";
+$sql .= " ORDER BY sc.created_at DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $enrollments = $stmt->fetchAll();
@@ -137,21 +138,14 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
           </div></div>
           
           <div class="col-md-6"><div class="form-group-lms">
-            <label>Assigned Lecturer</label>
-            <select name="lecturer_id" class="form-control-lms">
-              <option value="">None Assigned...</option>
-              <?php foreach($lecturers as $l): ?>
-                <option value="<?= $l['id'] ?>" <?= ($editEnrollment['lecturer_id']??0) == $l['id'] ? 'selected' : '' ?>>
-                  <?= htmlspecialchars($l['name']) ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
+            <label>Start Date</label>
+            <input type="date" name="start_date" class="form-control-lms" value="<?= $editEnrollment['start_date'] ?? date('Y-m-d') ?>">
           </div></div>
-
+          
           <div class="col-md-6"><div class="form-group-lms">
             <label>Status</label>
             <select name="status" class="form-control-lms">
-              <option value="active" <?= ($editEnrollment['status']??'')==='active'?'selected':'' ?>>Active</option>
+              <option value="ongoing" <?= ($editEnrollment['status']??'')==='ongoing'?'selected':'' ?>>Ongoing</option>
               <option value="completed" <?= ($editEnrollment['status']??'')==='completed'?'selected':'' ?>>Completed</option>
               <option value="dropped" <?= ($editEnrollment['status']??'')==='dropped'?'selected':'' ?>>Dropped</option>
             </select>
@@ -185,10 +179,9 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
       <table class="table-lms searchable-table">
         <thead>
           <tr>
-            <th>Date</th>
+            <th>Start Date</th>
             <th>Student</th>
             <th>Course</th>
-            <th>Lecturer</th>
             <th>Status</th>
             <th>Actions</th>
           </tr>
@@ -196,20 +189,28 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
         <tbody>
           <?php foreach ($enrollments as $e): ?>
           <tr>
-            <td><?= date('M d, Y', strtotime($e['enrolled_at'])) ?></td>
-            <td class="fw-600"><?= htmlspecialchars($e['student_name']) ?></td>
+            <td><?= $e['start_date'] ? date('M d, Y', strtotime($e['start_date'])) : '—' ?></td>
+            <td class="fw-600">
+              <a href="<?= BASE_URL ?>/admin/payments/add.php?student_id=<?= $e['student_id'] ?>&course_id=<?= $e['course_id'] ?>" 
+                 style="color:inherit;text-decoration:none;" title="Click to pay">
+                <?= htmlspecialchars($e['student_name']) ?>
+              </a>
+            </td>
             <td>
               <div><?= htmlspecialchars($e['course_name']) ?></div>
               <small class="text-muted"><?= htmlspecialchars($e['course_code']) ?></small>
             </td>
-            <td><?= htmlspecialchars($e['lecturer_name'] ?? 'TBA') ?></td>
             <td>
-              <span class="badge-lms <?= $e['status']==='active'?'success':($e['status']==='completed'?'info':'danger') ?>">
+              <span class="badge-lms <?= $e['status']==='ongoing'?'primary':($e['status']==='completed'?'success':'danger') ?>">
                 <?= ucfirst($e['status']) ?>
               </span>
             </td>
             <td>
               <div class="d-flex gap-10">
+                <a href="<?= BASE_URL ?>/admin/payments/add.php?student_id=<?= $e['student_id'] ?>&course_id=<?= $e['course_id'] ?>" 
+                   class="btn-lms btn-success btn-sm" title="Add Payment">
+                  <i class="fas fa-money-bill-wave"></i>
+                </a>
                 <a href="?action=edit&id=<?= $e['id'] ?>" class="btn-lms btn-outline btn-sm"><i class="fas fa-pen"></i></a>
                 <form method="POST" style="display:inline;">
                   <input type="hidden" name="act" value="delete">

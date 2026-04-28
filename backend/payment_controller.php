@@ -26,13 +26,23 @@ function syncOverduePayments(PDO $pdo) {
 // -------------------------------------------------------
 // Get Student Latest Payment Info to Calculate Dues
 // -------------------------------------------------------
-function getPaymentInfoForm(PDO $pdo, int $studentId, int $courseId): array {
+function getPaymentInfoForm(PDO $pdo, int $studentId, int $courseId, ?string $targetMonth = null): array {
+    $targetMonth = $targetMonth ?: date('Y-m');
     // 1. Get course fee
     $stmt1 = $pdo->prepare("SELECT monthly_fee FROM courses WHERE id = ?");
     $stmt1->execute([$courseId]);
     $courseFee = (float)$stmt1->fetchColumn();
 
-    // 2. Get latest balance for this student+course
+    // 2. Check if a payment for THIS month already exists
+    $stmtCheck = $pdo->prepare("
+        SELECT id FROM student_payments 
+        WHERE student_id = ? AND course_id = ? AND month = ?
+        LIMIT 1
+    ");
+    $stmtCheck->execute([$studentId, $courseId, $targetMonth]);
+    $existsThisMonth = $stmtCheck->fetch();
+
+    // 3. Get latest balance
     $stmt2 = $pdo->prepare("
         SELECT balance 
         FROM student_payments 
@@ -44,12 +54,15 @@ function getPaymentInfoForm(PDO $pdo, int $studentId, int $courseId): array {
     $prevBalance = $stmt2->fetchColumn();
     if ($prevBalance === false) $prevBalance = 0.00;
 
-    $totalDue = $courseFee + $prevBalance;
+    // Logic: If they already have a record for this month, total due is just the balance of that record.
+    // If NOT, total due is courseFee + prevBalance.
+    $totalDue = $existsThisMonth ? (float)$prevBalance : ($courseFee + (float)$prevBalance);
+    $feeToApply = $existsThisMonth ? 0.00 : $courseFee;
 
     return [
-        'monthly_fee'      => $courseFee,
+        'monthly_fee'      => (float)$feeToApply,
         'previous_balance' => (float)$prevBalance,
-        'total_due'        => $totalDue
+        'total_due'        => (float)$totalDue
     ];
 }
 
@@ -57,10 +70,12 @@ function getPaymentInfoForm(PDO $pdo, int $studentId, int $courseId): array {
 // Add Payment Record
 // -------------------------------------------------------
 function addPayment(PDO $pdo, array $d): array {
-    $studentId   = (int)($d['student_id'] ?? 0);
-    $courseId    = (int)($d['course_id']  ?? 0);
-    $amountPaid  = (float)($d['amount_paid'] ?? 0);
-    $month       = trim($d['month'] ?? date('Y-m'));
+    $studentId     = (int)($d['student_id'] ?? 0);
+    $courseId      = (int)($d['course_id']  ?? 0);
+    $amountPaid    = (float)($d['amount_paid'] ?? 0);
+    $month         = trim($d['month'] ?? date('Y-m'));
+    $method        = trim($d['method'] ?? 'cash');
+    $reference     = trim($d['reference'] ?? '');
 
     if (!$studentId || !$courseId) {
         return ['success' => false, 'errors' => ['Student and Course are required.']];
@@ -72,26 +87,17 @@ function addPayment(PDO $pdo, array $d): array {
     $info = getPaymentInfoForm($pdo, $studentId, $courseId);
     $totalDue = $info['total_due'];
 
-    // Core Logic 1 & 2
-    if ($amountPaid >= $totalDue) {
-        $status = 'paid';
-        $balance = 0.00;
-        // If they paid extra, balance could be negative, meaning advance payment, but we clamp it or store the negative
-        $balance = $totalDue - $amountPaid; // could be < 0
-    } else {
-        $balance = $totalDue - $amountPaid;
-        $status = 'partial';
-    }
+    $balance = $totalDue - $amountPaid;
+    $status  = ($balance <= 0) ? 'paid' : 'partial';
 
-    // Next due date: standard logic is 1 month from current payment date, or fixed day of month. 
-    // Let's set next due date as 1 month from now.
+    // Next due date logic
     $nextDueDate = date('Y-m-d', strtotime('+1 month'));
 
     try {
         $pdo->prepare("
             INSERT INTO student_payments 
-            (student_id, course_id, month, monthly_fee, previous_balance, total_due, amount_paid, balance, status, payment_date, next_due_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+            (student_id, course_id, month, monthly_fee, previous_balance, total_due, amount_paid, balance, status, payment_date, next_due_date, method, reference)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)
         ")->execute([
             $studentId, 
             $courseId, 
@@ -102,12 +108,14 @@ function addPayment(PDO $pdo, array $d): array {
             $amountPaid, 
             $balance, 
             $status, 
-            $nextDueDate
+            $nextDueDate,
+            $method,
+            $reference
         ]);
         return ['success' => true, 'id' => $pdo->lastInsertId()];
     } catch (PDOException $e) {
         error_log('addPayment: ' . $e->getMessage());
-        return ['success' => false, 'errors' => ['Failed to process payment.']];
+        return ['success' => false, 'errors' => ['Failed to process payment. Please ensure database schema is updated with method/reference columns.']];
     }
 }
 

@@ -43,6 +43,32 @@ require_once dirname(__DIR__, 2) . '/includes/header.php';
 require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
 ?>
 
+<style>
+/* Courses Page Mobile Adjustments */
+@media (max-width: 768px) {
+  #page-content { padding: 16px 20px; }
+  .page-header { flex-direction: column; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+  .page-header .d-flex { width: 100%; flex-wrap: wrap; gap: 8px !important; }
+  .page-header .btn-lms { flex: 1; min-width: 140px; padding: 10px 12px; font-size: 12px; justify-content: center; }
+  .page-header .btn-primary-grad { width: 100%; justify-content: center; padding: 12px; }
+  
+  .stat-card { padding: 15px 12px !important; gap: 12px !important; border-radius: 18px !important; }
+  .stat-card .stat-icon { width: 38px !important; height: 38px !important; font-size: 16px !important; border-radius: 12px !important; }
+  .stat-card .stat-value { font-size: 20px !important; }
+  .stat-card .stat-label { font-size: 9.5px !important; margin-top: 2px !important; }
+  
+  .students-filter-bar { flex-direction: column; align-items: flex-start !important; padding: 20px 16px !important; gap: 16px; }
+  .students-filters { flex-direction: column; width: 100%; gap: 12px !important; }
+  .search-bar { max-width: none !important; background: #f8fafc; }
+  .filter-select { width: 100% !important; }
+  .students-filters .btn-lms { width: 100%; justify-content: center; }
+
+  .enroll-badge { flex-direction: column !important; padding: 6px 10px !important; gap: 0 !important; line-height: 1.1; }
+  .enroll-badge .count { font-size: 13px; font-weight: 800; }
+  .enroll-badge .label { font-size: 8.5px; text-transform: uppercase; opacity: 0.8; letter-spacing: 0.5px; }
+}
+</style>
+
 <div id="page-content">
 
   <div class="page-header">
@@ -199,7 +225,10 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
               <?php endif; ?>
             </td>
             <td>
-              <span class="badge-lms info"><?= $c['student_count'] ?> enrolled</span>
+              <span class="badge-lms info enroll-badge">
+                <span class="count"><?= $c['student_count'] ?></span>
+                <span class="label">Enrolled</span>
+              </span>
             </td>
             <td>
               <?php if ($c['status'] === 'active'): ?>

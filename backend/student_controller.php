@@ -69,16 +69,17 @@ function addStudent(PDO $pdo, array $data): array {
     try {
         $stmt = $pdo->prepare("
             INSERT INTO students
-              (student_id, full_name, nic_number, batch_number, join_date,
+              (student_id, full_name, profile_picture, nic_number, batch_number, join_date,
                office_email, office_email_password, personal_email,
                phone_number, whatsapp_number, guardian_name, guardian_phone, guardian_verified,
                house_address, boarding_address, next_follow_up, follow_up_note, status)
             VALUES
-              (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $studentId,
             trim($data['full_name']),
+            !empty($data['profile_picture']) ? $data['profile_picture'] : null,
             trim($data['nic_number']),
             trim($data['batch_number']),
             !empty($data['join_date']) ? $data['join_date'] : null,
@@ -127,6 +128,7 @@ function updateStudent(PDO $pdo, int $id, array $data): array {
         $stmt = $pdo->prepare("
             UPDATE students SET
               full_name             = ?,
+              profile_picture       = ?,
               nic_number            = ?,
               batch_number          = ?,
               join_date             = ?,
@@ -145,6 +147,7 @@ function updateStudent(PDO $pdo, int $id, array $data): array {
         ");
         $stmt->execute([
             trim($data['full_name']),
+            !empty($data['profile_picture']) ? $data['profile_picture'] : null,
             trim($data['nic_number']),
             trim($data['batch_number']),
             !empty($data['join_date']) ? $data['join_date'] : null,

@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS `student_payments` (
   `status` enum('paid','partial','pending','overdue') NOT NULL DEFAULT 'pending',
   `payment_date` datetime NOT NULL,
   `next_due_date` date NOT NULL,
+  `method` enum('cash','bank_transfer','online') DEFAULT 'cash',
+  `reference` varchar(100) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `student_id` (`student_id`),

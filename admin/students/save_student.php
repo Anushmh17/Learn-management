@@ -12,7 +12,7 @@ require_once __DIR__ . '/../../backend/document_controller.php';
 
 // ── Guard: POST only, admin only ──────────────────────
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: add_student_form.html');
+    header('Location: add.php');
     exit;
 }
 
@@ -51,7 +51,7 @@ if (!$result['success']) {
     session_start();
     $_SESSION['form_errors']  = $result['errors'];
     $_SESSION['form_old']     = $studentData;
-    header('Location: add_student_form.html');
+    header('Location: add.php');
     exit;
 }
 
@@ -157,5 +157,5 @@ if (empty($docErrors)) {
     $_SESSION['flash_warning'] = 'Student added, but some document uploads failed:<br>' . implode('<br>', array_map('htmlspecialchars', $docErrors));
 }
 
-header('Location: ../../admin/students/students.php');
+header('Location: index.php');
 exit;

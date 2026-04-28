@@ -45,71 +45,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $form[$key] = $_POST[$key] ?? '';
     }
 
-    $pdo->beginTransaction();
+    // --- Handle Profile Picture Upload ---
+    if (!empty($_FILES['profile_picture']['name'])) {
+        $upload = uploadDocumentFile($_FILES['profile_picture'], 'profile', 0); // Using 0 as student ID temporarily
+        if ($upload['success']) {
+            $form['profile_picture'] = $upload['path'];
+        } else {
+            $errors[] = "Profile Picture Error: " . $upload['error'];
+        }
+    }
 
-    $result = addStudent($pdo, $form);
+    if (!$errors) {
+        $pdo->beginTransaction();
+        $result = addStudent($pdo, $form);
 
-    if ($result['success']) {
-        $studentInternalId = $result['id'];
-        $newId = $result['student_id'];
-        
-        // --- Process Documents ---
-        $docRow = getOrCreateDocRecord($pdo, $studentInternalId);
-        
-        foreach ($docDefs as $docKey => $def) {
-            $trackData = [
-                'status'       => isset($_POST["doc_status_$docKey"]) ? 1 : 0,
-                'collected_by' => $_POST["doc_office_$docKey"] ?? null,
-                'date'         => !empty($_POST["doc_date_$docKey"]) ? $_POST["doc_date_$docKey"] : null,
-            ];
-
-            // Handle file upload if any
-            if (!empty($_FILES['doc_files']['name'][$docKey])) {
-                $fileArray = [
-                    'name'     => $_FILES['doc_files']['name'][$docKey],
-                    'type'     => $_FILES['doc_files']['type'][$docKey],
-                    'tmp_name' => $_FILES['doc_files']['tmp_name'][$docKey],
-                    'error'    => $_FILES['doc_files']['error'][$docKey],
-                    'size'     => $_FILES['doc_files']['size'][$docKey],
-                ];
+        if ($result['success']) {
+            $studentInternalId = $result['id'];
+            $newId = $result['student_id'];
+            
+            // Rename profile picture file if uploaded (since we now have the real internal ID)
+            if (!empty($form['profile_picture'])) {
+                $oldPath = BASE_PATH . '/assets/documents/' . $form['profile_picture'];
+                $ext = pathinfo($form['profile_picture'], PATHINFO_EXTENSION);
+                $newFileName = "profile_{$studentInternalId}." . $ext;
+                $newPath = BASE_PATH . '/assets/documents/' . $newFileName;
                 
-                $uploadResult = uploadDocumentFile($fileArray, $docKey, $studentInternalId);
-                if ($uploadResult['success']) {
-                    $trackData['file_path'] = $uploadResult['path'];
-                    $trackData['status'] = 1; // Auto-set status if file uploaded
-                } else {
-                    // We could collect upload errors here, but for now we proceed
-                    error_log("Upload error for $docKey: " . $uploadResult['error']);
+                if (rename($oldPath, $newPath)) {
+                    $pdo->prepare("UPDATE students SET profile_picture = ? WHERE id = ?")->execute([$newFileName, $studentInternalId]);
                 }
             }
+            
+            // --- Process Documents ---
+            $docRow = getOrCreateDocRecord($pdo, $studentInternalId);
+            
+            foreach ($docDefs as $docKey => $def) {
+                $trackData = [
+                    'status'       => isset($_POST["doc_status_$docKey"]) ? 1 : 0,
+                    'collected_by' => $_POST["doc_office_$docKey"] ?? null,
+                    'date'         => !empty($_POST["doc_date_$docKey"]) ? $_POST["doc_date_$docKey"] : null,
+                ];
 
-            saveDocTracking($pdo, $studentInternalId, $docKey, $trackData);
+                // Handle file upload if any
+                if (!empty($_FILES['doc_files']['name'][$docKey])) {
+                    $fileArray = [
+                        'name'     => $_FILES['doc_files']['name'][$docKey],
+                        'type'     => $_FILES['doc_files']['type'][$docKey],
+                        'tmp_name' => $_FILES['doc_files']['tmp_name'][$docKey],
+                        'error'    => $_FILES['doc_files']['error'][$docKey],
+                        'size'     => $_FILES['doc_files']['size'][$docKey],
+                    ];
+                    
+                    $uploadResult = uploadDocumentFile($fileArray, $docKey, $studentInternalId);
+                    if ($uploadResult['success']) {
+                        $trackData['file_path'] = $uploadResult['path'];
+                        $trackData['status'] = 1; // Auto-set status if file uploaded
+                    } else {
+                        error_log("Upload error for $docKey: " . $uploadResult['error']);
+                    }
+                }
+
+                saveDocTracking($pdo, $studentInternalId, $docKey, $trackData);
+            }
+
+            // If coming from lead conversion, update lead status
+            $leadId = (int)($_POST['lead_id'] ?? $_GET['lead_id'] ?? 0);
+            if ($leadId > 0) {
+                $pdo->prepare("UPDATE leads SET status='converted' WHERE id=?")->execute([$leadId]);
+            }
+            
+            $pdo->commit();
+
+            // --- Handle Follow-up Email Alert ---
+            if (!empty($_POST['send_email_alert']) && !empty($_POST['follow_up_note'])) {
+                $studentData = [
+                    'full_name'    => $form['full_name'],
+                    'student_id'   => $newId,
+                    'phone_number' => $form['phone_number']
+                ];
+                sendAdminFollowUpEmail($studentData, $_POST['follow_up_note'], $_POST['next_follow_up'] ?: null);
+            }
+
+            setFlash('success', "Student added successfully! Student ID: <strong>{$newId}</strong>");
+            header('Location: index.php');
+            exit;
+        } else {
+            $pdo->rollBack();
+            $errors = $result['errors'];
         }
-
-        // If coming from lead conversion, update lead status
-        $leadId = (int)($_POST['lead_id'] ?? $_GET['lead_id'] ?? 0);
-        if ($leadId > 0) {
-            $pdo->prepare("UPDATE leads SET status='converted' WHERE id=?")->execute([$leadId]);
-        }
-        
-        $pdo->commit();
-
-        // --- Handle Follow-up Email Alert ---
-        if (!empty($_POST['send_email_alert']) && !empty($_POST['follow_up_note'])) {
-            $studentData = [
-                'full_name'    => $form['full_name'],
-                'student_id'   => $newId,
-                'phone_number' => $form['phone_number']
-            ];
-            sendAdminFollowUpEmail($studentData, $_POST['follow_up_note'], $_POST['next_follow_up'] ?: null);
-        }
-
-        setFlash('success', "Student added successfully! Student ID: <strong>{$newId}</strong>");
-        header('Location: index.php');
-        exit;
-    } else {
-        $pdo->rollBack();
-        $errors = $result['errors'];
     }
 }
 
@@ -214,6 +236,12 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
                     <option value="dropout" <?= $form['status'] === 'dropout' ? 'selected' : '' ?>>Dropout</option>
                     <option value="completed" <?= $form['status'] === 'completed' ? 'selected' : '' ?>>Completed</option>
                   </select>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="form-group-lms">
+                  <label for="profile_picture">Profile Picture (JPG/PNG)</label>
+                  <input type="file" id="profile_picture" name="profile_picture" class="form-control-lms" accept="image/*">
                 </div>
               </div>
             </div>
@@ -386,11 +414,11 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
           </div>
         </div>
 
-        <!-- SECTION 6: DOCUMENT CHECKLIST -->
+        <!-- SECTION 7: DOCUMENT CHECKLIST -->
         <div class="card-lms mb-30 document-checklist-card">
           <div class="card-lms-header d-flex justify-content-between align-items-center">
             <div class="card-lms-title">
-              <i class="fas fa-file-shield" style="color:#6366f1;"></i> Section 6 — Document Checklist
+              <i class="fas fa-file-shield" style="color:#6366f1;"></i> Section 7 — Document Checklist
             </div>
             <div class="header-badges">
               <span class="badge-lms info-premium" id="doc-count-badge">0 / 0 Collected</span>
@@ -456,7 +484,7 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
                       </select>
                     </td>
                     <td>
-                      <input type="date" name="doc_date_<?= $docKey ?>" class="form-control-lms form-control-sm doc-date-input" readonly>
+                      <input type="date" name="doc_date_<?= $docKey ?>" class="form-control-lms form-control-sm doc-date-input">
                     </td>
                   </tr>
                   <?php endforeach; ?>
@@ -565,9 +593,38 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
 <?php
 $extraJS = <<<'JS'
 <script>
+// Restriction logics
+function restrictNumbers(e) {
+    e.value = e.value.replace(/[^0-9]/g, '');
+}
+function restrictPhone(e) {
+    let val = e.value;
+    // Only allow + at the very beginning
+    if (val.length > 0) {
+        if (val[0] === '+') {
+            e.value = '+' + val.slice(1).replace(/[^0-9+]/g, '').replace(/\+/g, '');
+        } else {
+            e.value = val.replace(/[^0-9]/g, '');
+        }
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     updateOverallProgress();
     
+    // Apply restrictions
+    const phoneFields = ['phone_number', 'whatsapp_number', 'guardian_phone'];
+    phoneFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', function() { restrictPhone(this); });
+    });
+
+    const numFields = ['nic_number']; // User said no letters in number fields
+    numFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', function() { restrictNumbers(this); });
+    });
+
     // Toggle password visibility
     document.querySelectorAll('.toggle-password').forEach(btn => {
         btn.addEventListener('click', function() {

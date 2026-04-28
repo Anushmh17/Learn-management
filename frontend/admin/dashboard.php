@@ -17,7 +17,7 @@ $queries = [
     'students'    => "SELECT COUNT(*) FROM students WHERE status='new_joined'",
     'lecturers'   => "SELECT COUNT(*) FROM users WHERE role='lecturer' AND status='active'",
     'courses'     => "SELECT COUNT(*) FROM courses WHERE status='active'",
-    'enrollments' => "SELECT COUNT(*) FROM enrollments",
+    'enrollments' => "SELECT COUNT(*) FROM student_courses WHERE status='ongoing'",
     'revenue'     => "SELECT COALESCE(SUM(amount_paid),0) FROM student_payments",
     'notices'     => "SELECT COUNT(*) FROM notices",
     'followups'   => "SELECT COUNT(*) FROM students WHERE next_follow_up IS NOT NULL AND follow_up_status='pending'",
@@ -31,11 +31,12 @@ $pendingFollowUps = getPendingFollowUps($pdo, 4);
 
 // --- Recent enrollments ---
 $recentEnrollments = $pdo->query("
-    SELECT e.enrolled_at, s.full_name AS student, c.course_name AS course, e.status
-    FROM enrollments e
-    JOIN students s ON s.id = e.student_id
-    JOIN courses c ON c.id = e.course_id
-    ORDER BY e.enrolled_at DESC LIMIT 6
+    SELECT sc.created_at AS enrolled_at, s.full_name AS student, c.course_name AS course, sc.status,
+           sc.student_id, sc.course_id
+    FROM student_courses sc
+    JOIN students s ON s.id = sc.student_id
+    JOIN courses c ON c.id = sc.course_id
+    ORDER BY sc.created_at DESC LIMIT 6
 ")->fetchAll();
 
 // --- Recent payments ---
@@ -197,17 +198,26 @@ $adminName = explode(' ', $user['name'] ?? 'Admin')[0];
               <?php foreach ($recentEnrollments as $e): ?>
               <tr>
                 <td style="white-space:nowrap;">
-                  <div class="d-flex align-center gap-10">
-                    <div class="avatar-initials"><?= strtoupper(substr($e['student'],0,1)) ?></div>
-                    <?= htmlspecialchars($e['student']) ?>
-                  </div>
+                  <a href="<?= BASE_URL ?>/admin/payments/add.php?student_id=<?= $e['student_id'] ?>&course_id=<?= $e['course_id'] ?>" 
+                     style="color:inherit;text-decoration:none;" title="Click to pay">
+                    <div class="d-flex align-center gap-10">
+                      <div class="avatar-initials"><?= strtoupper(substr($e['student'],0,1)) ?></div>
+                      <?= htmlspecialchars($e['student']) ?>
+                    </div>
+                  </a>
                 </td>
                 <td><?= htmlspecialchars($e['course']) ?></td>
                 <td class="td-nowrap"><?= date('M d, Y', strtotime($e['enrolled_at'])) ?></td>
                 <td class="td-nowrap">
-                  <span class="badge-lms <?= $e['status']==='active'?'success':($e['status']==='completed'?'info':'danger') ?>">
-                    <?= ucfirst($e['status']) ?>
-                  </span>
+                  <div class="d-flex align-center gap-10">
+                    <span class="badge-lms <?= $e['status']==='ongoing'?'primary':($e['status']==='completed'?'success':'danger') ?>">
+                      <?= ucfirst($e['status']) ?>
+                    </span>
+                    <a href="<?= BASE_URL ?>/admin/payments/add.php?student_id=<?= $e['student_id'] ?>&course_id=<?= $e['course_id'] ?>" 
+                       style="color:var(--emerald-card);font-size:12px;" title="Quick Pay">
+                      <i class="fas fa-money-bill-wave"></i>
+                    </a>
+                  </div>
                 </td>
               </tr>
               <?php endforeach; ?>
@@ -459,8 +469,8 @@ $adminName = explode(' ', $user['name'] ?? 'Admin')[0];
     <?php else: ?>
     <div class="dm-list">
       <?php foreach (array_slice($recentEnrollments, 0, 4) as $e):
-        $sc = $e['status']==='active' ? '#00C9A7' : ($e['status']==='completed' ? '#4CC9F0' : '#FF6B6B');
-        $sl = $e['status']==='active' ? '#e0faf4' : ($e['status']==='completed' ? '#e6f6ff' : '#ffe8e8');
+        $sc = $e['status']==='ongoing' ? '#3b82f6' : ($e['status']==='completed' ? '#059669' : '#FF6B6B');
+        $sl = $e['status']==='ongoing' ? '#e0f2fe' : ($e['status']==='completed' ? '#f0fdf4' : '#ffe8e8');
       ?>
       <div class="dm-list-item">
         <div class="dm-li-avatar"><?= strtoupper(substr($e['student'],0,1)) ?></div>
@@ -469,6 +479,10 @@ $adminName = explode(' ', $user['name'] ?? 'Admin')[0];
           <div class="dm-li-sub"><?= htmlspecialchars($e['course']) ?></div>
         </div>
         <div class="dm-li-right">
+          <a href="<?= BASE_URL ?>/admin/payments/add.php?student_id=<?= $e['student_id'] ?>&course_id=<?= $e['course_id'] ?>" 
+             class="btn-lms btn-sm" style="background:#f0fdf4; color:#16a34a; padding:6px 10px; margin-bottom:4px;">
+            <i class="fas fa-money-bill-wave"></i>
+          </a>
           <div class="dm-li-badge" style="background:<?= $sl ?>;color:<?= $sc ?>;"><?= ucfirst($e['status']) ?></div>
           <div class="dm-li-date"><?= date('d M', strtotime($e['enrolled_at'])) ?></div>
         </div>

@@ -13,11 +13,12 @@ requireRole(ROLE_ADMIN);
 
 // Handle AJAX Info Fetch
 if (isset($_GET['api']) && $_GET['api'] === 'info') {
-    $sid = (int)($_GET['student_id'] ?? 0);
-    $cid = (int)($_GET['course_id'] ?? 0);
+    $sid   = (int)($_GET['student_id'] ?? 0);
+    $cid   = (int)($_GET['course_id'] ?? 0);
+    $month = $_GET['month'] ?? date('Y-m');
     if ($sid && $cid) {
         header('Content-Type: application/json');
-        echo json_encode(getPaymentInfoForm($pdo, $sid, $cid));
+        echo json_encode(getPaymentInfoForm($pdo, $sid, $cid, $month));
         exit;
     }
     header('Content-Type: application/json');
@@ -113,6 +114,31 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
 
         </div>
 
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="form-group-lms">
+              <label>Payment Month <span class="req">*</span></label>
+              <input type="month" name="month" id="month" class="form-control-lms" value="<?= date('Y-m') ?>" required onchange="fetchPaymentInfo()">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="form-group-lms">
+              <label>Payment Method <span class="req">*</span></label>
+              <select name="method" class="form-control-lms" required>
+                <option value="cash">Cash</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="online">Online</option>
+              </select>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="form-group-lms">
+              <label>Reference (Optional)</label>
+              <input type="text" name="reference" class="form-control-lms" placeholder="Txn ID, Receipt #">
+            </div>
+          </div>
+        </div>
+
         <hr style="margin:20px 0;border-color:#e2e8f0;">
 
         <!-- UI Display (Last Month Due, Current Fee, Total Payable) -->
@@ -150,8 +176,8 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
           </div>
           
           <div class="col-md-6">
-            <div style="padding:10px 14px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;display:flex;justify-content:space-between;align-items:center;">
-              <div style="font-size:12px;color:#991b1b;font-weight:700;text-transform:uppercase;">Remaining Balance</div>
+            <div id="rem_bal_box" style="padding:10px 14px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;display:flex;justify-content:space-between;align-items:center;">
+              <div id="rem_bal_label" style="font-size:12px;color:#991b1b;font-weight:700;text-transform:uppercase;">Remaining Balance</div>
               <div id="lbl_rem_bal" style="font-size:22px;font-weight:800;color:#dc2626;">Rs. 0.00</div>
             </div>
           </div>
@@ -189,8 +215,9 @@ function updateCourseList() {
 }
 
 function fetchPaymentInfo() {
-    const sId = document.getElementById('student_id').value;
-    const cId = document.getElementById('course_id').value;
+    const sId   = document.getElementById('student_id').value;
+    const cId   = document.getElementById('course_id').value;
+    const month = document.getElementById('month').value;
     
     if (!sId || !cId) {
         document.getElementById('lbl_prev_bal').textContent = 'Rs. 0.00';
@@ -201,7 +228,7 @@ function fetchPaymentInfo() {
         return;
     }
 
-    fetch(`add.php?api=info&student_id=${sId}&course_id=${cId}`)
+    fetch(`add.php?api=info&student_id=${sId}&course_id=${cId}&month=${month}`)
         .then(res => res.json())
         .then(data => {
             document.getElementById('lbl_prev_bal').textContent = 'Rs. ' + parseFloat(data.previous_balance).toFixed(2);
@@ -216,9 +243,44 @@ function fetchPaymentInfo() {
 function calcRemaining() {
     const paid = parseFloat(document.getElementById('amount_paid').value) || 0;
     let rem = currentTotalDue - paid;
-    if (rem < 0) rem = 0; // If overpaid, don't show negative here, or you could if you want.
-    document.getElementById('lbl_rem_bal').textContent = 'Rs. ' + rem.toFixed(2);
+    
+    const box   = document.getElementById('rem_bal_box');
+    const lbl   = document.getElementById('rem_bal_label');
+    const val   = document.getElementById('lbl_rem_bal');
+
+    if (rem <= 0) {
+        // Fully paid or Advance
+        box.style.background = '#f0fdf4';
+        box.style.borderColor = '#bbf7d0';
+        lbl.style.color = '#166534';
+        val.style.color = '#166534';
+        lbl.textContent = rem < 0 ? 'Advance Payment' : 'Paid in Full';
+        val.textContent = 'Rs. ' + Math.abs(rem).toFixed(2);
+    } else {
+        // Partial
+        box.style.background = '#fef2f2';
+        box.style.borderColor = '#fecaca';
+        lbl.style.color = '#991b1b';
+        val.style.color = '#dc2626';
+        lbl.textContent = 'Remaining Balance';
+        val.textContent = 'Rs. ' + rem.toFixed(2);
+    }
 }
+document.addEventListener('DOMContentLoaded', () => {
+    // Check for URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const sid = urlParams.get('student_id');
+    const cid = urlParams.get('course_id');
+
+    if (sid) {
+        document.getElementById('student_id').value = sid;
+        updateCourseList();
+        if (cid) {
+            document.getElementById('course_id').value = cid;
+            fetchPaymentInfo();
+        }
+    }
+});
 </script>
 
 <?php require_once dirname(__DIR__, 2) . '/includes/footer.php'; ?>

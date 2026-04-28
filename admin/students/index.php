@@ -71,7 +71,7 @@ function studentAvatarColor(string $name): string {
 }
 
 
-$extraCSS = '
+$extraCSS = <<<CSS
 <style>
 .doc-badge {
     padding: 4px 10px;
@@ -88,8 +88,17 @@ $extraCSS = '
 
 .id-badge-lms { background: #f1f5f9; color: #475569; font-weight: 700; padding: 4px 8px; border-radius: 6px; font-size: 12px; }
 .batch-badge-lms { background: #e0f2fe; color: #0369a1; font-weight: 600; padding: 4px 8px; border-radius: 6px; font-size: 12px; }
+
+/* Legend Styles */
+.list-legend { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+.list-legend-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); margin-bottom: 2px; }
+.list-legend-title { font-size: 18px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 8px; font-family: 'Poppins', sans-serif; }
+.count-badge { background: var(--primary-light); color: var(--primary); padding: 2px 10px; border-radius: 30px; font-size: 13px; font-weight: 800; }
+
+.students-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.filter-select { font-size: 13px !important; height: 38px !important; border-radius: 10px !important; padding: 0 12px !important; background-color: #f8fafc !important; }
 </style>
-';
+CSS;
 
 require_once dirname(__DIR__, 2) . '/includes/header.php';
 require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
@@ -152,23 +161,27 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
 
   <!-- Students Table Card -->
   <div class="card-lms">
-    <div class="card-lms-header students-filter-bar">
-      <div class="card-lms-title">
-        <i class="fas fa-table-list"></i>
-        All Students
-        <span class="badge-lms info" style="margin-left:6px;font-size:12px;"><?= $total ?></span>
+    <div class="card-lms-header" style="flex-direction: row-reverse;">
+      <!-- Title on Right (Legend Style) -->
+      <div class="list-legend">
+        <div class="list-legend-label">Student Management</div>
+        <div class="list-legend-title">
+          <span>All Students</span>
+          <span class="count-badge"><?= $total ?></span>
+        </div>
       </div>
 
-      <!-- Search + Filter Form -->
-      <form method="GET" id="filterForm" class="students-filters">
-        <div class="search-bar" style="min-width:220px;">
+      <!-- Filters on Left -->
+      <form method="GET" id="filterForm" class="students-filters" style="flex-grow:1; justify-content: flex-start;">
+        <div class="search-bar" style="min-width:240px; background: #fff; border-color: #e2e8f0;">
           <i class="fas fa-search"></i>
           <input type="text" name="search" id="searchInput"
-                 placeholder="Name, ID or NIC…"
+                 placeholder="Search Name, ID or NIC…"
                  value="<?= htmlspecialchars($search) ?>">
         </div>
 
         <select name="batch" class="form-control-lms filter-select" id="batchFilter"
+                style="max-width:140px;"
                 onchange="document.getElementById('filterForm').submit()">
           <option value="">All Batches</option>
           <?php foreach ($batches as $b): ?>
@@ -180,6 +193,7 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
         </select>
 
         <select name="status" class="form-control-lms filter-select" id="statusFilter"
+                style="max-width:140px;"
                 onchange="document.getElementById('filterForm').submit()">
           <option value="">All Status</option>
           <option value="new_joined"  <?= $status === 'new_joined'  ? 'selected' : '' ?>>New Joined</option>
@@ -189,11 +203,11 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
 
         <div class="filter-actions">
           <button type="submit" class="btn-lms btn-primary btn-sm">
-            <i class="fas fa-filter"></i> Filter
+            <i class="fas fa-filter"></i>
           </button>
           <?php if ($search || $batch || $status): ?>
-            <a href="index.php" class="btn-lms btn-outline btn-sm">
-              <i class="fas fa-xmark"></i> Clear
+            <a href="index.php" class="btn-lms btn-outline btn-sm" title="Clear Filters">
+              <i class="fas fa-xmark"></i>
             </a>
           <?php endif; ?>
         </div>
@@ -218,7 +232,7 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
             <th style="width:50px;">#</th>
             <th style="min-width:140px;">Student ID</th>
             <th>Full Name</th>
-            <th style="min-width:130px;">Batch</th>
+            <th style="min-width:100px;">Batch</th>
             <th>Phone</th>
             <th>Status</th>
             <th>Doc Status</th>
@@ -236,20 +250,28 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
               </span>
             </td>
             <td>
-              <div class="d-flex align-center gap-10">
-                <div class="avatar-initials"
-                     style="background:<?= studentAvatarColor($s['full_name']) ?>;flex-shrink:0;">
-                  <?= strtoupper(substr($s['full_name'], 0, 1)) ?>
+              <a href="<?= BASE_URL ?>/admin/payments/add.php?student_id=<?= $s['id'] ?>" 
+                 style="color:inherit;text-decoration:none;" title="Click to pay">
+                <div class="d-flex align-center gap-10">
+                  <div class="avatar-initials"
+                       style="background:<?= !empty($s['profile_picture']) ? 'none' : studentAvatarColor($s['full_name']) ?>;flex-shrink:0; overflow:hidden; padding:0;">
+                    <?php if (!empty($s['profile_picture'])): ?>
+                      <img src="<?= BASE_URL ?>/assets/documents/<?= htmlspecialchars($s['profile_picture']) ?>" 
+                           style="width: 100%; height: 100%; object-fit: cover;">
+                    <?php else: ?>
+                      <?= strtoupper(substr($s['full_name'], 0, 1)) ?>
+                    <?php endif; ?>
+                  </div>
+                  <div>
+                    <div class="fw-600" style="font-size:14px;"><?= htmlspecialchars($s['full_name']) ?></div>
+                    <div class="text-muted" style="font-size:11px;"><?= htmlspecialchars($s['nic_number']) ?></div>
+                  </div>
                 </div>
-                <div>
-                  <div class="fw-600" style="font-size:14px;"><?= htmlspecialchars($s['full_name']) ?></div>
-                  <div class="text-muted" style="font-size:11px;"><?= htmlspecialchars($s['nic_number']) ?></div>
-                </div>
-              </div>
+              </a>
             </td>
             <td>
               <span class="batch-badge-lms">
-                <?= htmlspecialchars($s['batch_number']) ?>
+                <?= htmlspecialchars(str_ireplace('BATCH-', '', $s['batch_number'])) ?>
               </span>
             </td>
             <td style="font-size:13px;"><?= htmlspecialchars($s['phone_number']) ?></td>
@@ -260,6 +282,12 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
             </td>
             <td>
               <div class="d-flex gap-6" style="justify-content:center;">
+                <a href="<?= BASE_URL ?>/admin/payments/add.php?student_id=<?= $s['id'] ?>"
+                   class="btn-lms btn-sm"
+                   style="background: #ecfdf5; color: #10b981; border: 1px solid #d1fae5;"
+                   title="Add Payment">
+                  <i class="fas fa-money-bill-wave"></i>
+                </a>
                 <a href="<?= BASE_URL ?>/admin/documents/manage.php?student_id=<?= $s['id'] ?>"
                    class="btn-lms btn-sm"
                    style="background:#ede9fe;color:#5b4efa;border:1px solid #ddd6fe;"

@@ -206,6 +206,120 @@ foreach ($defs as $key => $def) {
 // Load existing "Other" documents
 $otherDocs = getOtherStudentDocs($pdo, $studentId);
 
+$extraCSS = <<<'CSS'
+<style>
+/* Document Manager Specific Styles */
+.doc-student-banner {
+    background: #fff;
+    border-radius: var(--radius-lg);
+    border: 1.5px solid var(--border-color);
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+}
+.doc-student-banner::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 6px; height: 100%;
+    background: var(--primary);
+}
+.dsb-avatar {
+    width: 72px; height: 72px;
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 800; color: #fff;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+}
+.dsb-info { flex: 1; }
+.dsb-name { font-size: 22px; font-weight: 800; color: var(--text-main); margin-bottom: 6px; font-family: 'Poppins', sans-serif; }
+.dsb-meta { display: flex; gap: 15px; color: var(--text-muted); font-size: 13px; font-weight: 500; }
+.dsb-meta span { display: flex; align-items: center; gap: 6px; }
+.dsb-meta i { color: var(--primary); opacity: 0.7; }
+
+.dsb-status-box {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding-left: 24px;
+    border-left: 1.5px solid var(--border-light);
+}
+.dsb-progress-ring { position: relative; width: 72px; height: 72px; }
+.dsb-progress-ring svg { transform: rotate(-90deg); }
+.dsb-progress-ring .ring-pct {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px; font-weight: 800; color: var(--text-main);
+}
+.dsb-status-label { display: flex; flex-direction: column; gap: 4px; }
+
+/* Checklist Table */
+.doc-checklist-table { width: 100%; border-collapse: collapse; }
+.doc-checklist-table thead th {
+    padding: 14px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1.5px solid var(--border-light);
+    text-align: left;
+}
+.doc-checklist-table tbody td { padding: 14px 16px; vertical-align: middle; border-bottom: 1px solid var(--border-light); }
+.doc-checklist-table tbody tr:hover { background: #fcfcff; }
+
+.doc-status-dot { width: 10px; height: 10px; border-radius: 50%; }
+.doc-status-dot.collected { background: var(--accent); box-shadow: 0 0 8px rgba(0, 201, 167, 0.4); }
+.doc-status-dot.missing { background: var(--danger); box-shadow: 0 0 8px rgba(255, 107, 107, 0.4); }
+.doc-status-dot.optional { background: var(--text-muted); opacity: 0.3; }
+
+.doc-name { display: flex; align-items: center; gap: 8px; }
+.req-badge { background: #fff1f2; color: #e11d48; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+.opt-badge { background: #f1f5f9; color: #64748b; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+
+.doc-select, .doc-input { padding: 8px 10px; font-size: 12px; height: 36px; }
+.doc-file-cell { display: flex; align-items: center; gap: 8px; }
+.doc-file-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; background: var(--primary-light); color: var(--primary);
+    border-radius: 8px; font-size: 11px; font-weight: 700; transition: var(--transition);
+}
+.doc-file-link:hover { background: var(--primary); color: #fff; }
+.doc-del-file {
+    border: none; background: #fff1f2; color: #e11d48;
+    width: 24px; height: 24px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: var(--transition);
+}
+.doc-del-file:hover { background: #e11d48; color: #fff; }
+
+.doc-upload-label {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: #f8fafc; border: 1.5px dashed var(--border-color);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); cursor: pointer; transition: var(--transition);
+}
+.doc-upload-label:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+.doc-file-input { display: none; }
+
+.doc-save-cell { display: flex; align-items: center; gap: 12px; }
+.doc-check-wrap { cursor: pointer; display: flex; align-items: center; }
+.doc-checkbox {
+    width: 20px; height: 20px; cursor: pointer;
+    accent-color: var(--primary);
+}
+
+.section-badge {
+    background: var(--primary-light); color: var(--primary);
+    padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+}
+</style>
+CSS;
+
 require_once dirname(__DIR__, 2) . '/includes/header.php';
 require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
 ?>
@@ -222,42 +336,51 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
         <span><?= htmlspecialchars($student['full_name']) ?></span>
       </div>
     </div>
-    <a href="index.php" class="btn-lms btn-outline" id="btn-back-docs">
-      <i class="fas fa-arrow-left"></i> Back to List
-    </a>
+    <div class="page-header-right">
+        <a href="index.php" class="btn-lms btn-outline" id="btn-back-docs">
+          <i class="fas fa-arrow-left"></i> Back to List
+        </a>
+    </div>
   </div>
 
   <!-- Student Info Banner -->
   <div class="doc-student-banner mb-20">
-    <div class="dsb-avatar" style="background:<?= studentAvatarColor($student['full_name']) ?>">
-      <?= strtoupper(substr($student['full_name'], 0, 1)) ?>
-    </div>
+    <?php if (!empty($student['profile_picture'])): ?>
+      <div class="dsb-avatar" style="background: none; padding: 0; overflow: hidden; border: 2px solid var(--primary-light);">
+        <img src="<?= BASE_URL ?>/assets/documents/<?= htmlspecialchars($student['profile_picture']) ?>" 
+             style="width: 100%; height: 100%; object-fit: cover;" 
+             alt="<?= htmlspecialchars($student['full_name']) ?>">
+      </div>
+    <?php else: ?>
+      <div class="dsb-avatar" style="background:<?= studentAvatarColor($student['full_name']) ?>">
+        <?= strtoupper(substr($student['full_name'], 0, 1)) ?>
+      </div>
+    <?php endif; ?>
     <div class="dsb-info">
       <div class="dsb-name"><?= htmlspecialchars($student['full_name']) ?></div>
       <div class="dsb-meta">
         <span><i class="fas fa-id-badge"></i> <?= htmlspecialchars($student['student_id']) ?></span>
-        <span><i class="fas fa-layer-group"></i> <?= htmlspecialchars($student['batch_number']) ?></span>
+        <span><i class="fas fa-layer-group"></i> Batch <?= htmlspecialchars($student['batch_number']) ?></span>
         <span><i class="fas fa-phone"></i> <?= htmlspecialchars($student['phone_number']) ?></span>
       </div>
     </div>
     <div class="dsb-status-box">
-      <div class="dsb-progress-ring" data-pct="<?= $overallPct ?>">
+      <div class="dsb-progress-ring">
         <svg width="72" height="72" viewBox="0 0 72 72">
-          <circle cx="36" cy="36" r="28" fill="none" stroke="#e8e4ff" stroke-width="7"/>
-          <circle cx="36" cy="36" r="28" fill="none"
+          <circle cx="36" cy="36" r="30" fill="none" stroke="#f1f5f9" stroke-width="8"/>
+          <circle cx="36" cy="36" r="30" fill="none"
             stroke="<?= $overallStatus==='completed'?'#10b981':($overallStatus==='pending'?'#f59e0b':'#ef4444') ?>"
-            stroke-width="7"
-            stroke-dasharray="175.93"
-            stroke-dashoffset="<?= 175.93 - (175.93 * $overallPct / 100) ?>"
-            stroke-linecap="round"
-            transform="rotate(-90 36 36)"/>
+            stroke-width="8"
+            stroke-dasharray="188.5"
+            stroke-dashoffset="<?= 188.5 - (188.5 * $overallPct / 100) ?>"
+            stroke-linecap="round"/>
         </svg>
         <div class="ring-pct"><?= $overallPct ?>%</div>
       </div>
       <div class="dsb-status-label">
-        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Required Docs</div>
-        <div style="font-size:14px;font-weight:700;color:<?= $overallStatus==='completed'?'#059669':($overallStatus==='pending'?'#d97706':'#dc2626') ?>">
-          <?= $reqDone ?> / <?= $reqTotal ?> Collected
+        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Completion</div>
+        <div style="font-size:14px;font-weight:800;color:var(--text-main);">
+          <?= $reqDone ?> / <?= $reqTotal ?> <span style="font-size:11px;font-weight:500;color:#64748b;">Collected</span>
         </div>
         <?= renderDocStatusBadge($overallStatus) ?>
       </div>
@@ -285,19 +408,15 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
     </div>
   <?php endif; ?>
 
-  <!-- =====================================================
-       DOCUMENT CHECKLIST — grouped by category
-  ====================================================== -->
+  <!-- Checklist sections -->
   <?php foreach ($groups as $groupName => $groupDocs): ?>
   <div class="card-lms mb-20">
     <div class="card-lms-header">
       <div class="card-lms-title">
-        <i class="fas fa-folder-closed" style="color:#5b4efa;"></i>
+        <i class="fas fa-folder-open" style="color:var(--primary);"></i>
         <?= htmlspecialchars($groupName) ?>
       </div>
       <?php
-        $gReq  = array_filter($groupDocs, fn($d) => $d['required']);
-        $gDone = count(array_filter(array_keys($gReq), fn($k) => !empty($docRow[$k.'_status'])));
         $gTotal = count($groupDocs);
         $gDoneAll = count(array_filter(array_keys($groupDocs), fn($k) => !empty($docRow[$k.'_status'])));
       ?>
@@ -305,18 +424,17 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
         <?= $gDoneAll ?> / <?= $gTotal ?> collected
       </span>
     </div>
-    <div class="card-lms-body" style="padding:0;">
+    <div class="card-lms-body" style="padding:0; overflow-x:auto;">
       <table class="doc-checklist-table">
         <thead>
           <tr>
-            <th style="width:30px;"></th>
-            <th>Document</th>
-            <th style="width:100px;">Type</th>
-            <th style="width:130px;">Office</th>
-            <th style="width:140px;">Date Collected</th>
-            <th style="width:180px;">File</th>
-            <th style="width:80px;">Upload</th>
-            <th style="width:80px;">Save</th>
+            <th style="width:40px;"></th>
+            <th>Document Description</th>
+            <th style="width:120px;">Importance</th>
+            <th style="width:130px;">Office/Center</th>
+            <th style="width:150px;">Date Collected</th>
+            <th style="width:180px;">Attached File</th>
+            <th style="width:80px; text-align:center;">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -326,120 +444,80 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
             $collectedBy = $docRow[$docKey . '_collected_by'] ?? '';
             $collectedDate = $docRow[$docKey . '_date'] ?? '';
             $filePath    = $docRow[$docKey] ?? '';
-            $rowClass    = $isCollected ? 'doc-row-collected' : ($def['required'] ? 'doc-row-missing' : 'doc-row-optional');
+            $formId      = "form-" . $docKey;
           ?>
-          <tr class="<?= $rowClass ?>" id="doc-row-<?= $docKey ?>">
-            <!-- Status indicator dot -->
-            <td>
+          <tr id="doc-row-<?= $docKey ?>">
+            <!-- Status Dot -->
+            <td style="text-align:center;">
               <div class="doc-status-dot <?= $isCollected ? 'collected' : ($def['required'] ? 'missing' : 'optional') ?>"></div>
             </td>
 
-            <!-- Document name -->
+            <!-- Doc Info -->
             <td>
               <div class="doc-name">
-                <i class="fas <?= $def['icon'] ?>" style="color:<?= $isCollected?'#059669':'#94a3b8' ?>;margin-right:6px;"></i>
-                <span class="fw-600"><?= htmlspecialchars($def['label']) ?></span>
-                <?php if ($def['required']): ?>
-                  <span class="req-badge">Required</span>
+                <i class="fas <?= $def['icon'] ?>" style="color:<?= $isCollected?'var(--accent)':'#cbd5e1' ?>; font-size:16px;"></i>
+                <span class="fw-700" style="font-size:14px;"><?= htmlspecialchars($def['label']) ?></span>
+              </div>
+            </td>
+
+            <!-- Type -->
+            <td>
+              <?php if ($def['required']): ?>
+                <span class="req-badge">Required</span>
+              <?php else: ?>
+                <span class="opt-badge">Optional</span>
+              <?php endif; ?>
+            </td>
+
+            <!-- Mini Form Start (using form attribute for validity) -->
+            <form id="<?= $formId ?>" method="POST" action="manage.php?student_id=<?= $studentId ?>" enctype="multipart/form-data">
+                <input type="hidden" name="doc_key" value="<?= $docKey ?>">
+                <input type="hidden" name="doc_status" value="<?= $isCollected?1:0 ?>" id="hidden-status-<?= $docKey ?>">
+            </form>
+
+            <!-- Office -->
+            <td>
+              <select name="collected_by" form="<?= $formId ?>" class="form-control-lms doc-select">
+                <option value="">— Select —</option>
+                <?php foreach (['W1','W2','H1','H2'] as $office): ?>
+                  <option value="<?= $office ?>" <?= $collectedBy === $office ? 'selected' : '' ?>><?= $office ?></option>
+                <?php endforeach; ?>
+              </select>
+            </td>
+
+            <!-- Date -->
+            <td>
+              <input type="date" name="collected_date" form="<?= $formId ?>" class="form-control-lms doc-input" value="<?= htmlspecialchars($collectedDate) ?>">
+            </td>
+
+            <!-- File Link / Upload -->
+            <td>
+              <div class="doc-file-cell">
+                <?php if ($filePath): ?>
+                  <a href="<?= BASE_URL ?>/assets/documents/<?= htmlspecialchars($filePath) ?>" target="_blank" class="doc-file-link">
+                    <i class="fas <?= str_ends_with($filePath,'.pdf') ? 'fa-file-pdf' : 'fa-file-image' ?>"></i>
+                    <?= strtoupper(pathinfo($filePath, PATHINFO_EXTENSION)) ?>
+                  </a>
+                  <button type="submit" name="delete_file" form="<?= $formId ?>" value="1" class="doc-del-file" data-confirm="Remove file?"><i class="fas fa-trash-alt"></i></button>
                 <?php else: ?>
-                  <span class="opt-badge">Optional</span>
+                  <label class="doc-upload-label" title="Upload">
+                    <i class="fas fa-plus"></i>
+                    <input type="file" name="doc_file" id="file-<?= $docKey ?>" form="<?= $formId ?>" class="doc-file-input" onchange="handleFileChange('<?= $docKey ?>')">
+                  </label>
+                  <span id="file-name-<?= $docKey ?>" style="font-size:11px;color:#94a3b8;font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;">Pending</span>
                 <?php endif; ?>
               </div>
             </td>
 
-            <!-- Type indicator -->
-            <td>
-              <?php if ($def['required']): ?>
-                <span class="badge-lms" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:10px;">
-                  <i class="fas fa-star" style="font-size:8px;"></i> Required
-                </span>
-              <?php else: ?>
-                <span class="badge-lms" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;font-size:10px;">
-                  Optional
-                </span>
-              <?php endif; ?>
-            </td>
-
-            <!-- Inline mini-form for this document -->
-            <form method="POST" action="manage.php?student_id=<?= $studentId ?>"
-                  enctype="multipart/form-data"
-                  id="form-<?= $docKey ?>"
-                  class="doc-inline-form">
-              <input type="hidden" name="doc_key"    value="<?= $docKey ?>">
-              <input type="hidden" name="doc_status" value="0" id="hidden-status-<?= $docKey ?>">
-
-              <!-- Office dropdown -->
-              <td>
-                <select name="collected_by" class="form-control-lms doc-select"
-                        id="office-<?= $docKey ?>">
-                  <option value="">— Office —</option>
-                  <?php foreach (['W1','W2','H1','H2'] as $office): ?>
-                    <option value="<?= $office ?>" <?= $collectedBy === $office ? 'selected' : '' ?>>
-                      <?= $office ?>
-                    </option>
-                  <?php endforeach; ?>
-                </select>
-              </td>
-
-              <!-- Date picker -->
-              <td>
-                <input type="date" name="collected_date" class="form-control-lms doc-input"
-                       id="date-<?= $docKey ?>"
-                       value="<?= htmlspecialchars($collectedDate) ?>">
-              </td>
-
-              <!-- File preview / delete -->
-              <td>
-                <?php if ($filePath): ?>
-                  <div class="doc-file-cell">
-                    <a href="<?= BASE_URL ?>/assets/documents/<?= htmlspecialchars($filePath) ?>"
-                       target="_blank" class="doc-file-link"
-                       title="View <?= htmlspecialchars($def['label']) ?>">
-                      <i class="fas <?= str_ends_with($filePath,'.pdf') ? 'fa-file-pdf' : 'fa-file-image' ?>"></i>
-                      <span><?= strtoupper(pathinfo($filePath, PATHINFO_EXTENSION)) ?></span>
-                    </a>
-                    <button type="submit" name="delete_file" value="1"
-                            class="doc-del-file"
-                            data-confirm="Remove this file?"
-                            title="Remove file">
-                      <i class="fas fa-xmark"></i>
+            <!-- Save Action -->
+            <td style="text-align:center;">
+                <div class="doc-save-cell" style="justify-content:center;">
+                    <input type="checkbox" class="doc-checkbox" id="check-<?= $docKey ?>" <?= $isCollected ? 'checked' : '' ?> onchange="syncHiddenStatus('<?= $docKey ?>')">
+                    <button type="submit" form="<?= $formId ?>" class="btn-lms btn-primary btn-sm" style="padding: 8px 10px; border-radius:8px;">
+                        <i class="fas fa-save"></i>
                     </button>
-                  </div>
-                <?php else: ?>
-                  <span style="font-size:11px;color:#94a3b8;">No file</span>
-                <?php endif; ?>
-              </td>
-
-              <!-- Upload button -->
-              <td>
-                <label class="doc-upload-label" for="file-<?= $docKey ?>" title="Upload file">
-                  <i class="fas fa-cloud-arrow-up"></i>
-                  <input type="file" name="doc_file" id="file-<?= $docKey ?>"
-                         accept=".pdf,.jpg,.jpeg,.png"
-                         class="doc-file-input"
-                         onchange="handleFileChange('<?= $docKey ?>')">
-                </label>
-              </td>
-
-              <!-- Collected checkbox + Save -->
-              <td>
-                <div class="doc-save-cell">
-                  <label class="doc-check-wrap" title="Mark as collected">
-                    <input type="checkbox" class="doc-checkbox"
-                           id="check-<?= $docKey ?>"
-                           <?= $isCollected ? 'checked' : '' ?>
-                           onchange="syncHiddenStatus('<?= $docKey ?>')">
-                    <span class="doc-checkmark"></span>
-                  </label>
-                  <button type="submit" class="btn-lms btn-primary btn-sm doc-save-btn"
-                          id="save-<?= $docKey ?>"
-                          onclick="syncHiddenStatus('<?= $docKey ?>')">
-                    <i class="fas fa-floppy-disk"></i>
-                  </button>
                 </div>
-              </td>
-
-            </form>
+            </td>
           </tr>
           <?php endforeach; ?>
         </tbody>
@@ -448,86 +526,58 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
   </div>
   <?php endforeach; ?>
 
-  <!-- =====================================================
-       OTHER SUPPORTING DOCUMENTS
-  ====================================================== -->
+  <!-- Supporting Docs Card -->
   <div class="card-lms mt-40">
-    <div class="card-lms-header" style="background:linear-gradient(90deg, #f8fafc, #f1f5f9);">
-      <div class="card-lms-title">
-        <i class="fas fa-file-circle-plus" style="color:#0ea5e9;"></i>
-        Other Supporting Documents
-      </div>
-      <span class="badge-lms info"><?= count($otherDocs) ?> Uploaded</span>
+    <div class="card-lms-header">
+      <div class="card-lms-title"><i class="fas fa-paperclip"></i> Other Supporting Documents</div>
+      <span class="badge-lms info"><?= count($otherDocs) ?> Items</span>
     </div>
     <div class="card-lms-body">
-      
-      <!-- Upload New Other Doc -->
-      <form method="POST" enctype="multipart/form-data" class="mb-20 p-3" style="background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1;">
+      <form method="POST" enctype="multipart/form-data" class="mb-20 p-4" style="background:#f8fafc; border-radius:16px; border:1.5px dashed #cbd5e1;">
         <div class="row g-3 align-items-end">
-          <div class="col-md-4">
+          <div class="col-md-5">
             <div class="form-group-lms mb-0">
-              <label style="font-size:12px;font-weight:600;">Document Label / Name</label>
+              <label>Document Title</label>
               <input type="text" name="other_label" class="form-control-lms" placeholder="e.g. Birth Certificate" required>
             </div>
           </div>
-          <div class="col-md-3">
+          <div class="col-md-4">
             <div class="form-group-lms mb-0">
-              <label style="font-size:12px;font-weight:600;">File (PDF/Image)</label>
+              <label>Select File</label>
               <input type="file" name="other_file" class="form-control-lms" required>
             </div>
           </div>
-          <div class="col-md-2">
-            <div class="form-group-lms mb-0">
-              <label style="font-size:12px;font-weight:600;">Office</label>
-              <select name="other_collected_by" class="form-control-lms">
-                <option value="">—</option>
-                <option value="W1">W1</option><option value="W2">W2</option>
-                <option value="H1">H1</option><option value="H2">H2</option>
-              </select>
-            </div>
-          </div>
-          <div class="col-md-3 d-flex gap-2">
+          <div class="col-md-3">
             <button type="submit" name="add_other" class="btn-primary-grad w-100">
-              <i class="fas fa-upload"></i> Upload Extra
+              <i class="fas fa-cloud-upload-alt"></i> Upload Now
             </button>
           </div>
         </div>
       </form>
 
-      <?php if (empty($otherDocs)): ?>
-        <p class="text-muted text-center py-3" style="font-size:13px;">No additional supporting documents uploaded.</p>
-      <?php else: ?>
+      <?php if (!empty($otherDocs)): ?>
       <div class="table-responsive">
         <table class="table-lms">
           <thead>
             <tr>
-              <th>Document Name</th>
-              <th>Office</th>
-              <th>Uploaded Date</th>
-              <th>File</th>
-              <th style="text-align:right;">Actions</th>
+              <th>Document</th>
+              <th>Uploaded On</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
             <?php foreach ($otherDocs as $od): ?>
             <tr>
+              <td class="fw-700"><?= htmlspecialchars($od['label']) ?></td>
+              <td><?= date('M d, Y', strtotime($od['created_at'])) ?></td>
               <td>
-                <div class="fw-700" style="color:var(--text-main);"><?= htmlspecialchars($od['label']) ?></div>
-              </td>
-              <td><span class="badge-lms secondary"><?= htmlspecialchars($od['collected_by'] ?: '—') ?></span></td>
-              <td style="font-size:12px;"><?= date('M d, Y', strtotime($od['created_at'])) ?></td>
-              <td>
-                <a href="<?= BASE_URL ?>/assets/documents/<?= htmlspecialchars($od['file_path']) ?>" target="_blank" class="btn-lms btn-outline btn-sm">
-                  <i class="fas fa-eye"></i> View
-                </a>
-              </td>
-              <td style="text-align:right;">
-                <form method="POST" style="display:inline;" onsubmit="return confirm('Remove this additional document?')">
-                  <input type="hidden" name="del_other_id" value="<?= $od['id'] ?>">
-                  <button type="submit" class="btn-lms btn-danger btn-sm">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </form>
+                <div class="d-flex gap-10">
+                    <a href="<?= BASE_URL ?>/assets/documents/<?= htmlspecialchars($od['file_path']) ?>" target="_blank" class="btn-lms btn-outline btn-sm"><i class="fas fa-eye"></i> View</a>
+                    <form method="POST" onsubmit="return confirm('Remove?')">
+                        <input type="hidden" name="del_other_id" value="<?= $od['id'] ?>">
+                        <button type="submit" class="btn-lms btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
               </td>
             </tr>
             <?php endforeach; ?>
@@ -543,40 +593,31 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
 <?php
 function studentAvatarColor(string $name): string {
     $colors = ['#5b4efa','#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4'];
-    return $colors[ord($name[0]) % count($colors)];
+    return $colors[ord($name[0]??'A') % count($colors)];
 }
-?>
 
-<?php
 $extraJS = <<<'JS'
 <script>
-// Sync checkbox → hidden status field
 function syncHiddenStatus(docKey) {
   const cb  = document.getElementById('check-' + docKey);
   const hid = document.getElementById('hidden-status-' + docKey);
   if (cb && hid) hid.value = cb.checked ? '1' : '0';
 }
-
-// When file selected, show filename preview and auto-check
 function handleFileChange(docKey) {
   const fileInput = document.getElementById('file-' + docKey);
-  const cb        = document.getElementById('check-' + docKey);
-  const hid       = document.getElementById('hidden-status-' + docKey);
-  if (fileInput.files.length > 0) {
-    // Auto-check status when file is attached
-    if (cb) { cb.checked = true; }
-    if (hid) hid.value = '1';
-    // Show filename in tooltip
-    fileInput.closest('label').title = fileInput.files[0].name;
+  const nameDisplay = document.getElementById('file-name-' + docKey);
+  const cb = document.getElementById('check-' + docKey);
+  
+  if (fileInput && fileInput.files.length > 0) {
+    const fileName = fileInput.files[0].name;
+    if (nameDisplay) {
+      nameDisplay.innerText = fileName;
+      nameDisplay.style.color = 'var(--primary)';
+      nameDisplay.style.fontWeight = '700';
+    }
+    if (cb) { cb.checked = true; syncHiddenStatus(docKey); }
   }
 }
-
-// Init all states on load
-document.querySelectorAll('.doc-checkbox').forEach(cb => {
-  const key = cb.id.replace('check-', '');
-  const hid = document.getElementById('hidden-status-' + key);
-  if (hid) hid.value = cb.checked ? '1' : '0';
-});
 </script>
 JS;
 

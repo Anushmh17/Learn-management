@@ -33,11 +33,11 @@ INSERT IGNORE INTO `users` (`name`, `email`, `password`, `role`, `status`) VALUE
 -- -------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `courses` (
   `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  `title`       VARCHAR(200) NOT NULL,
-  `code`        VARCHAR(20)  NOT NULL UNIQUE,
+  `course_name` VARCHAR(200) NOT NULL,
+  `course_code` VARCHAR(20)  NOT NULL UNIQUE,
   `description` TEXT,
   `duration`    VARCHAR(50)  DEFAULT NULL,
-  `fee`         DECIMAL(10,2) DEFAULT 0.00,
+  `monthly_fee` DECIMAL(10,2) DEFAULT 0.00,
   `status`      ENUM('active','inactive') NOT NULL DEFAULT 'active',
   `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS `enrollments` (
   `enrolled_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `status`      ENUM('active','completed','dropped') DEFAULT 'active',
   UNIQUE KEY `unique_enrollment` (`student_id`, `course_id`),
-  FOREIGN KEY (`student_id`)  REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`student_id`)  REFERENCES `students`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`course_id`)   REFERENCES `courses`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`lecturer_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB;
@@ -121,18 +121,37 @@ CREATE TABLE IF NOT EXISTS `submissions` (
 -- -------------------------------------------------------
 -- Table: payments
 -- -------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `payments` (
-  `id`           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  `student_id`   INT UNSIGNED NOT NULL,
-  `course_id`    INT UNSIGNED NOT NULL,
-  `amount`       DECIMAL(10,2) NOT NULL,
-  `paid_date`    DATE          NOT NULL,
-  `method`       ENUM('cash','bank_transfer','online') DEFAULT 'cash',
-  `reference`    VARCHAR(100)  DEFAULT NULL,
-  `status`       ENUM('paid','pending','failed') DEFAULT 'paid',
-  `created_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (`student_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`course_id`)  REFERENCES `courses`(`id`) ON DELETE CASCADE
+CREATE TABLE IF NOT EXISTS `student_payments` (
+  `id`               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `student_id`       INT UNSIGNED NOT NULL,
+  `course_id`        INT UNSIGNED NOT NULL,
+  `month`            VARCHAR(7)   NOT NULL,
+  `monthly_fee`      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `previous_balance` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `total_due`        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `amount_paid`      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `balance`          DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `status`           ENUM('paid','partial','pending','overdue') NOT NULL DEFAULT 'pending',
+  `payment_date`     DATETIME      NOT NULL,
+  `next_due_date`    DATE          NOT NULL,
+  `method`           ENUM('cash','bank_transfer','online') DEFAULT 'cash',
+  `reference`        VARCHAR(100)  DEFAULT NULL,
+  `created_at`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`student_id`) REFERENCES `students`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`course_id`)  REFERENCES `courses`(`id`)  ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `student_courses` (
+  `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `student_id` INT UNSIGNED NOT NULL,
+  `course_id`  INT UNSIGNED NOT NULL,
+  `start_date` DATE         DEFAULT NULL,
+  `end_date`   DATE         DEFAULT NULL,
+  `status`     ENUM('ongoing','completed','dropped') NOT NULL DEFAULT 'ongoing',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `unique_student_course` (`student_id`, `course_id`),
+  FOREIGN KEY (`student_id`) REFERENCES `students`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`course_id`)  REFERENCES `courses`(`id`)  ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- -------------------------------------------------------

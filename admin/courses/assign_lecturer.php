@@ -74,13 +74,7 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
     <a href="index.php" class="btn-lms btn-outline"><i class="fas fa-arrow-left"></i> Back to Courses</a>
   </div>
 
-  <!-- Admin-only notice -->
-  <div class="alert-lms info" style="margin-bottom:20px;">
-    <i class="fas fa-shield-halved"></i>
-    <div>
-      <strong>Admin Only:</strong> Only administrators can assign lecturers to courses. Lecturers cannot assign themselves.
-    </div>
-  </div>
+
 
   <?php if ($errors): ?>
     <div class="alert-lms danger auto-dismiss">

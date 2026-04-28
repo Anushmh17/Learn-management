@@ -274,7 +274,44 @@ function updateFeePreview() {
     prev.style.display = 'none';
   }
 }
-document.addEventListener('DOMContentLoaded', updateFeePreview);
+
+// Searchable Select Enhancement
+function makeSearchable(selectId, placeholder) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'searchable-select-wrapper';
+  select.parentNode.insertBefore(wrapper, select);
+  wrapper.appendChild(select);
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'form-control-lms mb-1';
+  searchInput.placeholder = 'Search ' + placeholder + '...';
+  searchInput.style.fontSize = '12px';
+  searchInput.style.padding = '8px 12px';
+  wrapper.insertBefore(searchInput, select);
+
+  searchInput.addEventListener('input', function() {
+    const term = this.value.toLowerCase();
+    const options = select.options;
+    let firstVisible = -1;
+    for (let i = 0; i < options.length; i++) {
+      if (i === 0) continue; // Skip placeholder
+      const text = options[i].textContent.toLowerCase();
+      const visible = text.includes(term);
+      options[i].style.display = visible ? '' : 'none';
+      if (visible && firstVisible === -1) firstVisible = i;
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  updateFeePreview();
+  makeSearchable('student_id', 'Student');
+  makeSearchable('course_id', 'Course');
+});
 </script>
 JS;
 

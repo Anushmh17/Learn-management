@@ -89,8 +89,11 @@ require_once dirname(__DIR__, 2) . '/includes/sidebar.php';
                 RCPT-<?= str_pad($p['id'], 5, '0', STR_PAD_LEFT) ?>
               </td>
               <td>
-                <div class="fw-600"><?= htmlspecialchars($p['full_name']) ?></div>
-                <div style="font-size:11px;color:#64748b;"><?= htmlspecialchars($p['student_reg']) ?></div>
+                <a href="<?= BASE_URL ?>/admin/payments/add.php?student_id=<?= $p['student_id'] ?>&course_id=<?= $p['course_id'] ?>" 
+                   style="color:inherit;text-decoration:none;" title="Click to pay again">
+                  <div class="fw-600"><?= htmlspecialchars($p['full_name']) ?></div>
+                  <div style="font-size:11px;color:#64748b;"><?= htmlspecialchars($p['student_reg']) ?></div>
+                </a>
               </td>
               <td>
                 <div class="fw-600" style="font-size:12px;"><?= htmlspecialchars($p['course_code']) ?></div>

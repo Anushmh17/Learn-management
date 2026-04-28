@@ -22,8 +22,12 @@ CREATE TABLE IF NOT EXISTS `students` (
   `whatsapp_number`       VARCHAR(20)   DEFAULT NULL,
   `guardian_name`         VARCHAR(150)  DEFAULT NULL,
   `guardian_phone`        VARCHAR(20)   DEFAULT NULL,
+  `guardian_verified`     TINYINT(1)    NOT NULL DEFAULT 0,
   `house_address`         TEXT          DEFAULT NULL,
   `boarding_address`      TEXT          DEFAULT NULL,
+  `next_follow_up`        DATE          DEFAULT NULL,
+  `follow_up_note`        TEXT          DEFAULT NULL,
+  `follow_up_status`      ENUM('pending', 'completed') DEFAULT 'pending',
   `status`                ENUM('new_joined','dropout','completed') NOT NULL DEFAULT 'new_joined',
   `created_at`            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at`            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
